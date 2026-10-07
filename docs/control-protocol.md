@@ -349,7 +349,8 @@ a time); stale results are discarded. Only a bounded visible crop is uploaded to
 pan/zoom reuse developed pixels. Before and neutral settings read the original pixels directly.
 Full-resolution refinement is capped at 64 MP to bound the existing full-image engine pipeline;
 above that it explicitly reports unavailability and keeps the proxy. Oversized viewport crops
-also retain the proxy. The single-threaded wasm shell uses the same pixel path synchronously.
+also retain the proxy. Without a browser worker, wasm explicitly retains the filtered proxy
+rather than block its UI; Before and neutral settings still crop the original source pixels.
 The histogram and vectorscope continue to analyse the bounded proxy; readouts and clipping
 warnings use the full-resolution pixels once refinement is visible.
 

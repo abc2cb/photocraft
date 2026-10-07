@@ -82,7 +82,9 @@ impl DetailPreview {
             }
             Ok(_) => {} // A parameter changed while the worker was developing this revision.
             Err(e) => {
-                self.error = Some(e);
+                if requested_revision == revision {
+                    self.error = Some(e);
+                }
                 self.failed_revision = Some(requested_revision);
             }
         }
@@ -94,6 +96,7 @@ impl DetailPreview {
         }
         self.result = None;
         self.crop = None;
+        self.error = None;
         // The engine's full-image pipeline needs multiple temporary float buffers. Never start
         // an unbounded allocation just because a huge sparse document was zoomed into.
         if self.area.width() as u64 * self.area.height() as u64 > 64_000_000 {
@@ -139,9 +142,12 @@ impl DetailPreview {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            // The single-threaded web shell has no native worker. Keep the same pixel path.
-            work();
-            self.pending = Some((revision, rx));
+            // No browser worker/executor is available here. Preserve the interactive proxy
+            // instead of blocking its UI with the full-image engine pipeline.
+            drop(work);
+            drop(rx);
+            self.error = Some("Full-resolution filtered preview requires a native Camera Raw worker; the web preview keeps the proxy".into());
+            self.failed_revision = Some(revision);
         }
     }
 
