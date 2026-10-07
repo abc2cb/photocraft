@@ -347,7 +347,8 @@ Camera Raw lazily refines with the **same engine Camera Raw pipeline** at pixelS
 same selection/filter-mask coverage. Native refinement runs off the UI thread (one revision at
 a time); stale results are discarded. Only a bounded visible crop is uploaded to the GPU, and
 pan/zoom reuse developed pixels. Before and neutral settings read the original pixels directly.
-Full-resolution refinement is capped at 64 MP to bound the existing full-image engine pipeline;
+Absurd proxy domains (over 512 MP, including distant sparse off-canvas pixels) are rejected
+before reading pixels. Full-resolution refinement is capped at 64 MP to bound the existing full-image engine pipeline;
 above that it explicitly reports unavailability and keeps the proxy. Oversized viewport crops
 also retain the proxy. Without a browser worker, wasm explicitly retains the filtered proxy
 rather than block its UI; Before and neutral settings still crop the original source pixels.

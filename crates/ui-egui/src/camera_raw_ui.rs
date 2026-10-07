@@ -224,6 +224,9 @@ fn open_pixels(
         return Err("Camera Raw preview bounds are too large".into());
     };
     let (w, h) = (w as usize, h as usize);
+    if w.checked_mul(h).is_none_or(|pixels| pixels > 512_000_000) {
+        return Err("Camera Raw preview bounds are too large".into());
+    }
     let k = w.max(h).div_ceil(PROXY_SIDE).max(1);
     let (pw, ph) = (w.div_ceil(k), h.div_ceil(k));
     let mut proxy = vec![[0.0f32; 4]; pw * ph];
@@ -868,6 +871,20 @@ mod tests {
         menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"cancel": true}})).unwrap().unwrap();
         assert!(menu(&mut app, &ctx, "filter.cameraRaw", &json!({"smartFilter": {"layer": layer.0, "index": 7}})).unwrap().is_err());
         assert!(menu(&mut app, &ctx, "filter.cameraRaw", &json!({"smartFilter": {"layer": "x"}})).unwrap().is_err());
+    }
+
+    #[test]
+    fn distant_sparse_pixels_cannot_trigger_an_unbounded_proxy_scan() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let ctx = egui::Context::default();
+        app.run("file.new", json!({"width":64,"height":48})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        let layer = app.session.active().unwrap().active_layer.unwrap();
+        let mut source = photocraft_raster::Surface::new(photocraft_color::PixelFormat::RGBA8);
+        source.write_region(Rect::new(30_000, 30_000, 30_001, 30_001), &[0.5, 0.5, 0.5, 1.0]);
+        let result = open_pixels(&mut app, &ctx, layer, source, CameraRaw::default(), Coverage::None, Target::NewFilter);
+        assert!(result.unwrap_err().contains("bounds are too large"));
+        assert!(app.camera_raw.is_none());
     }
 
     #[test]
