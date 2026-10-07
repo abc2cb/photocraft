@@ -111,7 +111,7 @@ impl DetailPreview {
         params.pixel_scale = 1.0;
         let cancel = self.cancel.clone();
         let ctx = ctx.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = std::sync::mpsc::channel::<DetailResult>();
         let work = move || {
             if cancel.load(Ordering::Relaxed) {
                 return;
@@ -352,7 +352,7 @@ mod tests {
         let area = PixelRect::new(10, -5, 42, 19);
         let mut source = Surface::new(PixelFormat::RGBA8);
         let mut values = vec![0.0; 32 * 24 * 4];
-        for (i, p) in values.chunks_exact_mut(4).enumerate() {
+        for (i, p) in values.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             p.copy_from_slice(&[if i % 2 == 0 { 0.1 } else { 0.8 }, 0.3, 0.6, 1.0]);
         }
         source.write_region(area, &values);
