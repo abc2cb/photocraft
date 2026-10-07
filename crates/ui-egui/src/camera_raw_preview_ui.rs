@@ -108,19 +108,15 @@ pub(crate) fn interact(ui: &mut Ui, state: &mut CameraRawPreviewState, viewport:
     let panning = hand || response.dragged_by(PointerButton::Middle);
     let at = response.hover_pos().unwrap_or(viewport.center());
     let rect = state.image_rect(viewport, size);
+    // Reuse the canvas wheel policy: retain the modifiers of the wheel event while egui
+    // smooths it, even if Alt is released before the final part of the notch arrives.
+    let wheel = crate::wheel_nav::read(ui.ctx(), false);
     if response.hovered() {
-        let (scroll, pinch) = ui.input_mut(|i| {
-            let scroll = i.smooth_scroll_delta;
-            i.smooth_scroll_delta = Vec2::ZERO;
-            (scroll, i.zoom_delta())
-        });
-        if modifiers.alt && scroll.y.is_finite() && scroll.y != 0.0 {
-            state.zoom_at(state.scale(viewport, size) * (scroll.y * 0.002).clamp(-1.0, 1.0).exp(), at, viewport, size);
-        } else if !modifiers.alt {
-            state.pan(scroll, viewport, size);
-        }
-        if pinch.is_finite() && pinch != 1.0 {
-            state.zoom_at(state.scale(viewport, size) * pinch, at, viewport, size);
+        ui.input_mut(|i| i.smooth_scroll_delta = Vec2::ZERO);
+        match wheel {
+            Some(crate::wheel_nav::Wheel::Zoom(factor)) => state.zoom_at(state.scale(viewport, size) * factor, at, viewport, size),
+            Some(crate::wheel_nav::Wheel::Pan(delta)) => state.pan(delta, viewport, size),
+            None => {}
         }
         response.clone().on_hover_cursor(if hand {
             egui::CursorIcon::Grab
