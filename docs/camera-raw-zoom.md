@@ -1,25 +1,14 @@
 # Camera Raw preview navigation
 
-These captures show the native PhotoCraft Camera Raw dialog on Linux Mint. They
-use NASA's *Earthrise* (Apollo 8, 1968); see [LICENSE.txt](LICENSE.txt) for credits.
-Both screenshots include the Zoom, Hand, Fit in View, 100%, and zoom preset controls
-at the bottom left. The 100% capture has Exposure +0.15, Texture 25, Clarity 10,
-and Grain 15; it shows the completed native refinement.
+The Camera Raw dialog's preview has Zoom, Hand, Fit in View, 100%, and zoom preset
+controls at the bottom left.
 
-## Zoomed out: Fit in View
-
-The whole image fits inside the preview. Choose **Fit in View**, or press
-**Ctrl+0** on Windows/Linux (**Command+0** on macOS), to return here.
-
-![Camera Raw at Fit in View, with the navigation toolbar](fit.png)
-
-## Zoomed in: 100%
+Choose **Fit in View**, or press **Ctrl+0** on Windows/Linux (**Command+0** on macOS),
+to fit the whole image inside the preview.
 
 At **100%**, one source pixel maps to one physical display pixel, including HiDPI.
 The native preview refines the processed source in the background so texture,
 sharpening, and grain can be inspected beyond the reduced proxy's resolution.
-
-![Camera Raw at 100%, showing the refined Earth detail and navigation toolbar](actual-size.png)
 
 ## Controls
 

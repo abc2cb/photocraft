@@ -45,7 +45,6 @@ The other built-in ICC profiles and the generated LUT looks are produced by code
 | `docs/brand/` (all files) | ArtCraft name, wordmark and mark | ArtCraft Team | getartcraft.com | Not open source; trademarks of the ArtCraft Team, [`docs/brand/LICENSE-brand.txt`](docs/brand/LICENSE-brand.txt) |
 | `docs/images/photocraft-*.jpg` | PhotoCraft screenshots | PhotoCraft contributors (UI) | Rendered offscreen with the `snapshot` example | MIT OR Apache-2.0 (UI); the artwork in each is public domain, listed below |
 | `docs/images/preferences-apply-*.png` | Preferences before and after adding Apply (no artwork) | PhotoCraft contributors | PhotoCraft control-channel capture and offscreen `snapshot` example | MIT OR Apache-2.0 |
-| `docs/screenshots/camera-raw-zoom/{fit,actual-size}.png` | Camera Raw preview at Fit and 100% | PhotoCraft contributors (UI); William Anders / NASA (Earthrise) | Native PhotoCraft control-channel captures; [NASA Earth/Moon gallery](https://nssdc.gsfc.nasa.gov/photo_gallery/photogallery-earthmoon.html) | MIT OR Apache-2.0 (UI); public domain in the United States (NASA artwork), [license and credits](docs/screenshots/camera-raw-zoom/LICENSE.txt) |
 
 Artwork shown in the screenshots (all public domain, via Wikimedia Commons; details in
 [`docs/images/SOURCES.md`](docs/images/SOURCES.md)):
