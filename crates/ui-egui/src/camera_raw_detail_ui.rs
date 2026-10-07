@@ -111,7 +111,7 @@ impl DetailPreview {
         params.pixel_scale = 1.0;
         let cancel = self.cancel.clone();
         let ctx = ctx.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = std::sync::mpsc::channel::<DetailResult>();
         let work = move || {
             if cancel.load(Ordering::Relaxed) {
                 return;
