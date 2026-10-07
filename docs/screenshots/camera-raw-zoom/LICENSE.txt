@@ -1,0 +1,25 @@
+Camera Raw preview screenshots: fit.png and actual-size.png
+
+PhotoCraft UI and screenshot contribution:
+Copyright 2026 PhotoCraft contributors.
+Licensed under MIT OR Apache-2.0; see ../../../LICENSE-MIT and
+../../../LICENSE-APACHE.
+
+The rendered UI includes the existing Lucide / Feather icons and Inter / JetBrains Mono fonts.
+Their license notices are in assets/icons/LICENSE-lucide.txt and
+assets/fonts/OFL-Inter.txt and assets/fonts/OFL-JetBrainsMono.txt at the
+repository root; see ATTRIBUTION.md.
+No proprietary editor assets are included.
+
+Artwork: Earthrise, Apollo 8, 24 December 1968.
+Photographer: William Anders / NASA.
+United States government image; public domain in the United States.
+Source gallery:
+https://nssdc.gsfc.nasa.gov/photo_gallery/photogallery-earthmoon.html
+Source TIFF:
+https://nssdc.gsfc.nasa.gov/image/hi-res/planetary/earth/apollo08_earthrise.tiff
+NASA media usage guidelines:
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+
+The image is used to illustrate PhotoCraft's preview navigation. NASA does not
+endorse PhotoCraft. The original TIFF is not bundled with these screenshots.
