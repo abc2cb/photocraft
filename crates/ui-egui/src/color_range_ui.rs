@@ -210,10 +210,21 @@ fn proxy_mask(app: &PhotocraftApp, proxy: &Document, k: u32, params: &Value) -> 
         // Pick on the original document, not the thumbnail's nearest retained pixel. The
         // prepared Lab query is the same one the command uses at full resolution.
         let query = photocraft_engine::selection_cmds::ColorRangeSamples::new(&app.session, params).map_err(|e| e.to_string())?;
-        let pixels = photocraft_compose::render(proxy, area);
+        // Like the command (and OK): `sampleAllLayers: false` judges the active layer's own
+        // pixels, otherwise the composite.
+        let all_layers = params.get("sampleAllLayers").and_then(Value::as_bool).unwrap_or(true);
+        let layer = app.session.active().and_then(|d| d.active_layer).and_then(|id| proxy.layer(id)).and_then(|l| l.surface());
+        let px = match (all_layers, layer) {
+            (false, Some(surf)) => {
+                let mut px = vec![[0.0f32; 4]; area.width() as usize * area.height() as usize];
+                surf.read_rgba_into(area, &mut px);
+                px
+            }
+            _ => photocraft_compose::render(proxy, area).px,
+        };
         let invert = params.get("invert").and_then(Value::as_bool).unwrap_or(false);
         return Ok(query
-            .coverage(&pixels.px, area.width() as usize, k as f32, [0.0, 0.0])
+            .coverage(&px, area.width() as usize, k as f32, [0.0, 0.0])
             .into_iter()
             .map(|v| {
                 let v = if invert { 1.0 - v } else { v };
@@ -839,38 +850,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "24 MP before/after cache-key benchmark; run with --release --ignored --nocapture"]
-    fn color_range_hover_key_timings() {
-        let mut doc = Document::with_background("24 MP hover", Size::new(6000, 4000), ColorMode::Rgb, SampleType::U8, Color::WHITE);
-        doc.layers[0].surface_mut().unwrap().fill_rect(GRect::new(0, 0, 3000, 4000), &[0.8, 0.25, 0.1, 1.0]);
-        let mut session = photocraft_engine::Session::new();
-        session.add_document(doc, None);
-        let mut app = PhotocraftApp::new(session, crate::Services::default());
-        let p = json!({"select": "sampledColors", "points": [[1000, 1000]], "fuzziness": 40});
-        for explicit in [false, true] {
-            if explicit {
-                app.run("view.proofSetup", json!({"profile": "coated-cmyk"})).unwrap();
-            }
-            std::hint::black_box(query_key(&app, &p));
-            for legacy in [true, false] {
-                let start = std::time::Instant::now();
-                for _ in 0..30 {
-                    for _ in 0..3 {
-                        let key = if legacy {
-                            let proof = app.session.active().map(|st| app.session.color.proof(st.doc.id));
-                            hash(&format!("{p}:{:?}:{proof:?}", app.session.tools.foreground)).max(1)
-                        } else {
-                            query_key(&app, &p)
-                        };
-                        std::hint::black_box(key);
-                    }
-                }
-                eprintln!("24 MP, explicit proof={explicit}, legacy={legacy}: {:.3} ms/frame (3 key checks)", start.elapsed().as_secs_f64() * 1000.0 / 30.0);
-            }
-        }
-    }
-
-    #[test]
     fn opens_from_the_select_menu_without_touching_the_document() {
         let mut h = harness(app_with_doc());
         let rev = h.state().session.active().unwrap().revision;
@@ -1121,56 +1100,6 @@ mod tests {
         assert!(!pick_top(h.state_mut(), [-1.0, 0.0], egui::Modifiers::NONE));
     }
 
-    /// Local visual evidence and timings, using only a synthetic test document.
-    #[cfg(not(target_arch = "wasm32"))]
-    #[test]
-    #[ignore = "offscreen visual/performance check; requires COLOR_RANGE_EVIDENCE_DIR"]
-    fn color_range_phase1_visual_evidence_and_timings() {
-        let out = std::path::PathBuf::from(std::env::var_os("COLOR_RANGE_EVIDENCE_DIR").expect("evidence directory"));
-        std::fs::create_dir_all(&out).unwrap();
-        let mut h = Harness::builder().with_size(vec2(1366.0, 768.0)).with_pixels_per_point(1.0).wgpu().build_eframe(|cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            app_with_doc()
-        });
-        h.run_steps(5);
-        let view = &mut h.state_mut().ui.views[0];
-        view.zoom = 20.0;
-        view.center = [20.0, 15.0];
-        view.fit_pending = false;
-        let id = open(h.state_mut());
-        {
-            let app = h.state_mut();
-            let mut f = app.ui.dialog_mut(id).unwrap().fields.clone();
-            pick(app, &mut f, [5.0, 5.0], egui::Modifiers::NONE);
-            f.insert("fuzziness".into(), json!(40.0));
-            app.ui.dialog_mut(id).unwrap().fields = f;
-        }
-        for (mode, _) in PREVIEWS {
-            h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("__selectionPreview".into(), json!(mode));
-            h.run_steps(6);
-            h.render().unwrap().save(out.join(format!("color-range-{mode}.png"))).unwrap();
-        }
-        h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("__view".into(), json!("image"));
-        h.run_steps(6);
-        h.render().unwrap().save(out.join("color-range-image.png")).unwrap();
-        // 24 MP has actual stored pixels, rather than only a sparse default background.
-        let mut doc = Document::with_background("24 MP", Size::new(6000, 4000), ColorMode::Rgb, SampleType::U8, Color::WHITE);
-        doc.layers[0].surface_mut().unwrap().fill_rect(GRect::new(0, 0, 3000, 4000), &[0.8, 0.25, 0.1, 1.0]);
-        let mut session = photocraft_engine::Session::new();
-        session.add_document(doc, None);
-        let app = PhotocraftApp::new(session, crate::Services::default());
-        let doc = &app.session.active().unwrap().doc;
-        let params = json!({"points": [[1000, 1000]], "fuzziness": 40});
-        let start = std::time::Instant::now();
-        let proxy = crate::proxy::proxy_document(doc, 30);
-        let mask = proxy_mask(&app, &proxy, 30, &params).unwrap();
-        eprintln!("24 MP: thumbnail build + original-pixel sampling = {:.1} ms, {} preview pixels", start.elapsed().as_secs_f64() * 1000.0, mask.len());
-        let start = std::time::Instant::now();
-        let proxy = crate::proxy::proxy_document(doc, 6);
-        let mask = proxy_mask(&app, &proxy, 6, &params).unwrap();
-        eprintln!("24 MP: canvas preview build + original-pixel sampling = {:.1} ms, {} preview pixels", start.elapsed().as_secs_f64() * 1000.0, mask.len());
-    }
-
     #[test]
     fn modifier_temporarily_swaps_image_and_selection_thumbnail() {
         let mut h = harness(app_with_doc());
@@ -1218,6 +1147,30 @@ mod tests {
         assert_eq!(coverage(&app, 300, 0), 1.0);
         assert_eq!(shown[150], coverage(&app, 300, 0), "preview must show the same blue pixels as OK");
         assert_eq!(shown[0], coverage(&app, 0, 0), "preview must leave the red background unselected");
+    }
+
+    /// `sampleAllLayers: false` judges the active layer in the preview, as OK does.
+    #[test]
+    fn preview_honours_sample_all_layers_like_ok() {
+        let mut app = app_with_doc();
+        let doc = app.session.active().unwrap().doc.clone();
+        let mut top = photocraft_doc::Layer::new("blue cover", photocraft_doc::LayerContent::Raster(doc.layers[0].surface().unwrap().clone()));
+        top.surface_mut().unwrap().fill_rect(GRect::new(0, 0, 40, 30), &[0.0, 0.0, 1.0, 1.0]);
+        app.session
+            .edit("layers", |doc, _| {
+                doc.layers.push(top);
+                Ok(())
+            })
+            .unwrap();
+        for all_layers in [false, true] {
+            let p = json!({"select": "sampledColors", "points": [[5, 5]], "fuzziness": 0, "sampleAllLayers": all_layers});
+            let proxy = crate::proxy::proxy_document(&app.session.active().unwrap().doc, 1);
+            let shown = proxy_mask(&app, &proxy, 1, &p).unwrap();
+            app.run(COMMAND, p).unwrap();
+            for (x, y) in [(5, 5), (30, 5), (5, 20), (30, 20)] {
+                assert_eq!(shown[y * 40 + x], coverage(&app, x as i32, y as i32), "all_layers={all_layers} at ({x}, {y})");
+            }
+        }
     }
 
     #[test]
