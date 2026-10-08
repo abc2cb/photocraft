@@ -34,10 +34,10 @@ Generate screenshots using synthetic artwork without exposing your desktop:
 cargo run -p photocraft-ui-egui --example color_picker_demo -- /tmp/photocraft-color-picker
 ```
 
-On an X11 desktop, the explicitly ignored native test briefly displays an 8 × 8 synthetic swatch, captures it in memory and checks the known pixel:
+For reproducible native X11 capture verification, the explicitly ignored test displays an 8 × 8 synthetic swatch in an isolated Xvfb display, captures it in memory and checks the known pixel:
 
 ```sh
-cargo test -p photocraft screen_capture_reads_a_known_x11_fixture_pixel -- --ignored --test-threads=1
+xvfb-run -a cargo test -p photocraft screen_capture_reads_a_known_x11_fixture_pixel -- --ignored --test-threads=1
 ```
 
 Windows, macOS, Wayland portals, browser activation and mixed-DPI monitor arrangements additionally need manual validation on those environments; mock UI tests do not substitute for it.
