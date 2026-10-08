@@ -267,8 +267,7 @@ pub fn show(ctx: &Context) {
             .with_position(image.position / ctx.zoom_factor())
             .with_inner_size(image.size / ctx.zoom_factor())
             .with_window_level(egui::WindowLevel::AlwaysOnTop)
-            .with_clamp_size_to_monitor_size(false)
-            .with_override_redirect(cfg!(target_os = "linux"));
+            .with_clamp_size_to_monitor_size(false);
         if let Some(monitor) = image.monitor {
             builder = builder.with_monitor(monitor);
         }

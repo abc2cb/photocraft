@@ -312,7 +312,7 @@ fn checked_stride(width: usize, height: usize, stride: usize) -> Result<usize, S
     if stride < row || stride > row.saturating_add(4096) {
         return Err("Invalid screen row stride".into());
     }
-    stride.checked_mul(height).ok_or_else(|| "Invalid screen buffer length".into())
+    stride.checked_mul(height).filter(|&n| n <= MAX_PIXELS.saturating_mul(4)).ok_or_else(|| "Screen buffer exceeds the memory budget".into())
 }
 #[cfg(any(target_os = "macos", test))]
 fn unpack_rgba(bytes: &[u8], width: usize, height: usize, stride: usize, order: [usize; 4], premultiplied: bool, opaque: bool) -> Result<Vec<u8>, String> {
@@ -322,7 +322,7 @@ fn unpack_rgba(bytes: &[u8], width: usize, height: usize, stride: usize, order: 
     }
     let mut out = Vec::with_capacity(count(width, height)?.saturating_mul(4));
     for row in bytes.chunks_exact(stride).take(height) {
-        for p in row[..width * 4].chunks_exact(4) {
+        for p in row[..width * 4].as_chunks::<4>().0 {
             let a = if opaque { 255 } else { p[order[3]] };
             for &i in &order[..3] {
                 let v = u32::from(p[i]);
@@ -353,6 +353,7 @@ mod tests {
     fn screen_capture_rejects_unbounded_or_truncated_buffers() {
         assert!(count(usize::MAX, 2).is_err());
         assert!(checked_stride(1, 1, usize::MAX).is_err());
+        assert!(checked_stride(1, MAX_PIXELS, 4096).is_err());
         assert!(unpack_rgba(&[0; 3], 1, 1, 4, [0, 1, 2, 3], false, true).is_err());
         assert!(unpack_rgba(&[0; 4], 1, 1, 4, [4, 1, 2, 3], false, true).is_err());
     }
