@@ -2123,3 +2123,4 @@ cameraRaw	Color	カラー
 	Sample a pixel anywhere on the screen	画面上の任意のピクセルから色を取得
 	Click to pick · Esc to cancel	クリックで選択 · Escでキャンセル
 	Pick a screen pixel or press Esc to cancel	画面のピクセルを選択するか、Escでキャンセル
+Scroll to zoom	スクロールしてズーム

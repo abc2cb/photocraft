@@ -329,15 +329,22 @@ pub fn show(ctx: &Context) {
 fn loupe(ui: &egui::Ui, image: &ScreenImage, screen: Rect, pos: Pos2, pixel: (usize, usize), zoom: usize, rgb: Option<[f32; 3]>) {
     let (x, y) = pixel;
     let t = crate::theme::Tokens::get(ui.ctx());
-    let cell = zoom as f32;
-    let size = vec2(11.0 * cell + 12.0, 11.0 * cell + 64.0);
+    // The label describes physical pixel magnification, including Retina and UI zoom.
+    let cell = zoom as f32 / ui.ctx().pixels_per_point();
+    let p = ui.painter();
+    let pixel = image.pixel(x, y).unwrap_or(Color32::BLACK);
+    let color = rgb.map(crate::color_picker_ui::hex).unwrap_or_else(|| format!("#{:02x}{:02x}{:02x}", pixel.r(), pixel.g(), pixel.b()));
+    let label = p.layout_no_wrap(format!("{}   {}×", color.to_uppercase(), zoom), egui::FontId::monospace(12.0), t.text);
+    let hint = p.layout_no_wrap(tl!("Click to pick · Esc to cancel").to_owned(), egui::FontId::proportional(11.0), t.text);
+    let wheel = p.layout_no_wrap(tl!("Scroll to zoom").to_owned(), egui::FontId::proportional(11.0), t.text);
+    let width = (11.0 * cell + 12.0).max(label.size().x + 16.0).max(hint.size().x + 16.0).max(wheel.size().x + 16.0);
+    let size = vec2(width, 11.0 * cell + 76.0);
     let desired = pos + vec2(24.0, 24.0);
     let at = egui::pos2(desired.x.min(screen.right() - size.x).max(screen.left()), desired.y.min(screen.bottom() - size.y).max(screen.top()));
     let area = Rect::from_min_size(at, size);
-    let p = ui.painter();
     p.rect_filled(area, t.radius, t.card);
     p.rect_stroke(area, t.radius, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
-    let origin = at + vec2(6.0, 6.0);
+    let origin = at + vec2((width - 11.0 * cell) / 2.0, 6.0);
     for row in 0..11usize {
         for col in 0..11usize {
             let px = x.checked_add(col).and_then(|v| v.checked_sub(5));
@@ -349,11 +356,10 @@ fn loupe(ui: &egui::Ui, image: &ScreenImage, screen: Rect, pos: Pos2, pixel: (us
     let center = Rect::from_min_size(origin + vec2(5.0 * cell, 5.0 * cell), vec2(cell, cell));
     p.rect_stroke(center.expand(1.0), 0.0, Stroke::new(1.0, Color32::BLACK), StrokeKind::Inside);
     p.rect_stroke(center, 0.0, Stroke::new(1.0, Color32::WHITE), StrokeKind::Inside);
-    let pixel = image.pixel(x, y).unwrap_or(Color32::BLACK);
-    let color = rgb.map(crate::color_picker_ui::hex).unwrap_or_else(|| format!("#{:02x}{:02x}{:02x}", pixel.r(), pixel.g(), pixel.b()));
-    let label = format!("{}   {}×", color.to_uppercase(), zoom);
-    p.text(origin + vec2(0.0, 11.0 * cell + 8.0), egui::Align2::LEFT_TOP, label, egui::FontId::monospace(12.0), t.text);
-    p.text(origin + vec2(0.0, 11.0 * cell + 30.0), egui::Align2::LEFT_TOP, tl!("Click to pick · Esc to cancel"), egui::FontId::proportional(11.0), t.text);
+    let footer = at + vec2(8.0, 11.0 * cell + 14.0);
+    p.galley(footer, label, t.text);
+    p.galley(footer + vec2(0.0, 20.0), hint, t.text);
+    p.galley(footer + vec2(0.0, 36.0), wheel, t.text);
 }
 
 #[cfg(test)]

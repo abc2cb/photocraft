@@ -908,36 +908,40 @@ mod screen_color_tests {
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]
     fn compact_picker_delivers_screen_color_after_popup_closes_and_keeps_alpha() {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut receiver = Some(rx);
-        let services = crate::Services {
-            screen_pick: Some(Box::new(move |_| Pending {
-                receiver: receiver.take().unwrap(),
-                cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            })),
-            ..Default::default()
-        };
-        let app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        let original = Color32::from_rgba_unmultiplied(40, 50, 60, 128);
-        let mut h = Harness::builder().with_size(vec2(600.0, 500.0)).build_ui_state(
-            |ui, state: &mut (crate::PhotocraftApp, Color32, bool)| {
-                crate::screen_picker::tick(&mut state.0, ui.ctx());
-                state.2 = color_edit_button_srgba(ui, &mut state.1).changed();
-            },
-            (app, original, false),
-        );
-        h.get_by_role(egui::accesskit::Role::ColorWell).click();
-        h.run_steps(3);
-        h.get_by_label("Pick screen color").click();
-        h.run_steps(2);
-        assert_eq!(h.state().1, original);
-        egui::Popup::close_all(&h.ctx);
-        tx.send(Ok(Capture::Color(Some([1.0, 0.0, 0.5])))).unwrap();
-        h.run_steps(1);
-        assert!(h.state().2);
-        assert_eq!(h.state().1.a(), 128);
-        assert_eq!(h.state().1, Color32::from_rgba_unmultiplied(255, 0, 128, 128));
-        h.run_steps(1);
-        assert!(!h.state().2, "the pick commits once");
+        for (original, expected) in [
+            (Color32::from_rgba_unmultiplied(40, 50, 60, 128), Color32::from_rgba_unmultiplied(255, 0, 128, 128)),
+            (Color32::from_rgb_additive(40, 50, 60), Color32::from_rgb_additive(255, 0, 128)),
+        ] {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let mut receiver = Some(rx);
+            let services = crate::Services {
+                screen_pick: Some(Box::new(move |_| Pending {
+                    receiver: receiver.take().unwrap(),
+                    cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                })),
+                ..Default::default()
+            };
+            let app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), services);
+            let mut h = Harness::builder().with_size(vec2(600.0, 500.0)).build_ui_state(
+                |ui, state: &mut (crate::PhotocraftApp, Color32, bool)| {
+                    crate::screen_picker::tick(&mut state.0, ui.ctx());
+                    state.2 = color_edit_button_srgba(ui, &mut state.1).changed();
+                },
+                (app, original, false),
+            );
+            h.get_by_role(egui::accesskit::Role::ColorWell).click();
+            h.run_steps(3);
+            h.get_by_label("Pick screen color").click();
+            h.run_steps(2);
+            assert_eq!(h.state().1, original);
+            egui::Popup::close_all(&h.ctx);
+            tx.send(Ok(Capture::Color(Some([1.0, 0.0, 0.5])))).unwrap();
+            h.run_steps(1);
+            assert!(h.state().2);
+            assert_eq!(h.state().1.a(), original.a());
+            assert_eq!(h.state().1, expected);
+            h.run_steps(1);
+            assert!(!h.state().2, "the pick commits once");
+        }
     }
 }

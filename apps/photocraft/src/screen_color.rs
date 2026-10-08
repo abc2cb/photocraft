@@ -218,46 +218,73 @@ fn capture(_wayland: bool, _scale: f32, stop: &std::sync::atomic::AtomicBool, pl
 }
 #[cfg(target_os = "macos")]
 fn capture(_wayland: bool, _scale: f32, stop: &std::sync::atomic::AtomicBool, placements: &[Placement]) -> Result<Capture, String> {
-    use core_graphics2::{display::CGDisplay, window};
-    use screencapturekit::{
-        prelude::*,
-        screenshot_manager::{CGImageExt, SCScreenshotManager},
-        stream::configuration::color_space,
-    };
+    use core_graphics2::{display::get_active_display_list, image::CGImageAlphaInfo as Alpha, window};
     if !window::preflight_screen_capture_access() && !window::request_screen_capture_access() {
         return Err("Allow PhotoCraft in System Settings > Privacy & Security > Screen Recording, then reopen PhotoCraft".into());
     }
-    let content = SCShareableContent::get().map_err(|e| e.to_string())?;
-    let displays = content.displays();
+    let displays = get_active_display_list(17).ok_or("Could not enumerate displays")?;
     if displays.is_empty() || displays.len() > 16 {
         return Err("No supported screen is available".into());
     }
     let mut budget = 0usize;
-    let mut modes = Vec::new();
     for display in &displays {
-        let mode = CGDisplay::new(display.display_id()).copy_display_mode().ok_or("Display mode is unavailable")?;
-        let (w, h) = (mode.pixel_width(), mode.pixel_height());
-        budget = budget.checked_add(count(w, h)?).filter(|&n| n <= MAX_PIXELS).ok_or("Combined displays exceed the screen picker memory budget")?;
-        modes.push((w, h));
+        let mode = display.copy_display_mode().ok_or("Display mode is unavailable")?;
+        budget = budget
+            .checked_add(count(mode.pixel_width(), mode.pixel_height())?)
+            .filter(|&n| n <= MAX_PIXELS)
+            .ok_or("Combined displays exceed the screen picker memory budget")?;
     }
     let mut images = Vec::new();
     let mut total = 0usize;
-    for (display, (w, h)) in displays.iter().zip(modes) {
+    for display in displays {
         if stop.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(Capture::Color(None));
         }
-        let filter = SCContentFilter::create().with_display(display).with_excluding_windows(&[]).build().map_err(|e| e.to_string())?;
-        // Ask the OS to convert the composed display to sRGB instead of assuming a display ICC
-        // describes the captured pixels. Capture occurs before any sampling viewport is shown.
-        let config =
-            SCStreamConfiguration::new().with_width(w as u32).with_height(h as u32).with_color_space_name(color_space::SRGB).map_err(|e| e.to_string())?;
-        let image = SCScreenshotManager::capture_image(&filter, &config)
-            .map_err(|e| format!("Screen capture requires macOS 14+ and Screen Recording permission: {e}"))?;
+        // Capture a composed monitor at native resolution through safe bindings. Keeping the
+        // CoreGraphics seam preserves PhotoCraft's existing macOS 11 deployment target.
+        let bounds = display.bounds();
+        let image = window::new_image(
+            bounds,
+            window::CGWindowListOption::OnScreenOnly,
+            window::kCGNullWindowID,
+            window::CGWindowImageOption::BestResolution | window::CGWindowImageOption::ShouldBeOpaque,
+        )
+        .ok_or("Screen capture failed; check Screen Recording permission")?;
         let (width, height) = (image.width(), image.height());
         total = total.checked_add(count(width, height)?).filter(|&n| n <= MAX_PIXELS).ok_or("Combined displays exceed the screen picker memory budget")?;
-        let raw = image.rgba_data().map_err(|e| e.to_string())?;
-        let rgba = unpack_rgba(&raw, width, height, width.saturating_mul(4), [0, 1, 2, 3], true, false)?;
-        let bounds = display.frame();
+        let profile = image.color_space().and_then(|space| space.copy_icc_data());
+        if profile.as_ref().is_some_and(|p| p.len() > 1024 * 1024) {
+            return Err("Screen profile exceeds the memory budget".into());
+        }
+        let info = image.bitmap_info().bits();
+        if image.bits_per_component() != 8 || image.bits_per_pixel() != 32 || info & (1 << 8) != 0 {
+            return Err("Unsupported screen capture pixel format".into());
+        }
+        let (first, premultiplied, opaque) = match image.alpha_info() {
+            Alpha::AlphaPremultipliedFirst => (true, true, false),
+            Alpha::AlphaPremultipliedLast => (false, true, false),
+            Alpha::AlphaFirst => (true, false, false),
+            Alpha::AlphaLast => (false, false, false),
+            Alpha::AlphaNoneSkipFirst => (true, false, true),
+            Alpha::AlphaNoneSkipLast => (false, false, true),
+            _ => return Err("Unsupported screen capture alpha layout".into()),
+        };
+        let little = match info & 0x7000 {
+            0 => cfg!(target_endian = "little"),
+            0x2000 => true,
+            0x4000 => false,
+            _ => return Err("Unsupported screen capture byte order".into()),
+        };
+        let order = match (first, little) {
+            (true, true) => [2, 1, 0, 3],
+            (true, false) => [1, 2, 3, 0],
+            (false, true) => [3, 2, 1, 0],
+            (false, false) => [0, 1, 2, 3],
+        };
+        let stride = image.bytes_per_row();
+        checked_stride(width, height, stride)?;
+        let bytes = image.data_provider().and_then(|p| p.copy_data()).ok_or("Screen image has no pixels")?;
+        let rgba = unpack_rgba(bytes.bytes(), width, height, stride, order, premultiplied, opaque)?;
         let (w, h) = (bounds.size.width as f32, bounds.size.height as f32);
         let (x, y) = (bounds.origin.x as f32, bounds.origin.y as f32);
         if ![w, h, x, y].iter().all(|v| v.is_finite()) || w <= 0.0 || h <= 0.0 {
@@ -271,7 +298,7 @@ fn capture(_wayland: bool, _scale: f32, stop: &std::sync::atomic::AtomicBool, pl
             width,
             height,
             rgba,
-            profile: None,
+            profile: profile.map(|p| p.bytes().to_vec()),
         });
     }
     Ok(Capture::Images(images))
@@ -336,7 +363,7 @@ mod tests {
         use x11rb::{
             COPY_DEPTH_FROM_PARENT,
             connection::Connection,
-            protocol::xproto::{ConnectionExt, CreateWindowAux, WindowClass},
+            protocol::xproto::{ConfigureWindowAux, ConnectionExt, CreateWindowAux, StackMode, WindowClass},
         };
         let (conn, index) = x11rb::connect(None).unwrap();
         let screen = &conn.setup().roots[index];
@@ -345,8 +372,8 @@ mod tests {
             COPY_DEPTH_FROM_PARENT,
             window,
             screen.root,
-            8,
-            8,
+            200,
+            200,
             8,
             8,
             0,
@@ -358,14 +385,17 @@ mod tests {
         .check()
         .unwrap();
         conn.map_window(window).unwrap().check().unwrap();
+        conn.configure_window(window, &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE)).unwrap().check().unwrap();
         conn.flush().unwrap();
+        // X11 request completion precedes the compositor presenting the mapped fixture.
+        std::thread::sleep(std::time::Duration::from_millis(150));
         let images = capture(false, 1.0, &std::sync::atomic::AtomicBool::new(false), &[]);
         conn.destroy_window(window).unwrap().check().unwrap();
         conn.flush().unwrap();
         let Capture::Images(images) = images.unwrap() else { panic!("not an image capture") };
-        let first = images.iter().find(|m| m.position.x <= 8.0 && m.position.y <= 8.0).unwrap();
-        let x = (8.0 - first.position.x) as usize;
-        let y = (8.0 - first.position.y) as usize;
+        let first = images.iter().find(|m| m.position.x <= 200.0 && m.position.y <= 200.0).unwrap();
+        let x = (200.0 - first.position.x) as usize;
+        let y = (200.0 - first.position.y) as usize;
         let offset = (y * first.width + x) * 4;
         assert_eq!(&first.rgba[offset..offset + 4], &[255, 128, 64, 255]);
     }
@@ -377,6 +407,6 @@ mod tests {
     }
 }
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-fn capture(_wayland: bool, _scale: f32, _stop: &std::sync::atomic::AtomicBool, placements: &[Placement]) -> Result<Capture, String> {
+fn capture(_wayland: bool, _scale: f32, _stop: &std::sync::atomic::AtomicBool, _placements: &[Placement]) -> Result<Capture, String> {
     Err("Screen color picking is unavailable on this platform".into())
 }
