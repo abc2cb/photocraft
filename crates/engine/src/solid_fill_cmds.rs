@@ -176,7 +176,7 @@ mod tests {
             let count = s.active().unwrap().history.entries().len();
             for (value, rgb) in [
                 (json!("#336699"), Color::rgba(51.0 / 255.0, 102.0 / 255.0, 153.0 / 255.0, original.alpha)),
-                (json!([0.2, 0.4, 0.6]), Color::rgba(0.2, 0.4, 0.6, original.alpha)),
+                (json!([0.25, 0.5, 0.75]), Color::rgba(0.25, 0.5, 0.75, original.alpha)),
             ] {
                 let expected = rgb.in_mode(mode);
                 let result = s.execute(SET, json!({"layer": id, "color": value})).unwrap();
@@ -186,13 +186,18 @@ mod tests {
                 assert_eq!(stored.alpha, original.alpha);
             }
             assert_eq!(s.active().unwrap().history.entries().len(), count + 2);
-            let expected = Color::rgba(0.2, 0.4, 0.6, 0.25).in_mode(mode);
-            s.execute(SET, json!({"layer": id, "color": [0.2, 0.4, 0.6, 0.25]})).unwrap();
+            // Reapplying the same RGB array is a no-op, including after mode conversion.
+            let before_noop = s.active().unwrap().doc.clone();
+            s.execute(SET, json!({"layer": id, "color": [0.25, 0.5, 0.75]})).unwrap();
+            assert!(std::sync::Arc::ptr_eq(&before_noop, &s.active().unwrap().doc));
+            assert_eq!(s.active().unwrap().history.entries().len(), count + 2);
+            let expected = Color::rgba(0.25, 0.5, 0.75, 0.25).in_mode(mode);
+            s.execute(SET, json!({"layer": id, "color": [0.25, 0.5, 0.75, 0.25]})).unwrap();
             let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
             assert_eq!(stored, expected);
             s.execute("edit.undo", json!({})).unwrap();
             let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
-            assert_eq!(stored, Color::rgba(0.2, 0.4, 0.6, original.alpha).in_mode(mode));
+            assert_eq!(stored, Color::rgba(0.25, 0.5, 0.75, original.alpha).in_mode(mode));
             s.execute("edit.redo", json!({})).unwrap();
             let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
             assert_eq!(stored, expected);
