@@ -255,6 +255,12 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
                 f.insert("__webOnly".into(), json!(web));
                 set_rgb(f, current(f).rgb, Keep::Nothing);
             }
+            // Under the colour field, not in the action column: the dialog must still fit a
+            // 760 x 480 window.
+            ui.add_space(6.0);
+            if let Some(rgb) = crate::screen_picker::button(ui, ui.id().with("screen-color")) {
+                set_rgb(f, rgb, Keep::Nothing);
+            }
         });
         ui.vertical(|ui| {
             ui.horizontal_top(|ui| {
@@ -267,10 +273,6 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
                     ui.add_space(6.0);
                     if widgets::secondary_button(ui, tl!("Cancel"), button_width).clicked() {
                         outcome = Some(false);
-                    }
-                    ui.add_space(6.0);
-                    if let Some(rgb) = crate::screen_picker::button(ui, ui.id().with("screen-color")) {
-                        set_rgb(f, rgb, Keep::Nothing);
                     }
                     ui.add_space(6.0);
                     // Handled by the dialog host, which has the app (`take_add_swatch`).
