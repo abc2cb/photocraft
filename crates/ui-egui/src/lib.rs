@@ -1736,6 +1736,8 @@ mod stamp_tests;
 
 #[cfg(test)]
 mod alt_click_tests;
+#[cfg(test)]
+mod stroke_timing_tests;
 
 #[cfg(test)]
 mod polygon_lasso_tests;
