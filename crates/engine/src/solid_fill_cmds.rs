@@ -29,7 +29,9 @@ pub fn color_param(value: &Value, original: Color, mode: ColorMode) -> Result<Co
         }
         Value::Array(a) if (3..=4).contains(&a.len()) => {
             let channel = |i: usize| a.get(i).and_then(Value::as_f64).filter(|v| v.is_finite() && (0.0..=1.0).contains(v)).map(|v| v as f32);
-            let (Some(r), Some(g), Some(b)) = (channel(0), channel(1), channel(2)) else { return Err(bad("RGB components must be finite numbers within 0..1")) };
+            let (Some(r), Some(g), Some(b)) = (channel(0), channel(1), channel(2)) else {
+                return Err(bad("RGB components must be finite numbers within 0..1"));
+            };
             let alpha = if a.len() == 4 { channel(3).ok_or_else(|| bad("alpha must be a finite number within 0..1"))? } else { original.alpha };
             Color::rgba(r, g, b, alpha).in_mode(mode)
         }
@@ -240,7 +242,8 @@ mod tests {
         // Stored non-RGB colours are not subject to the RGB picker component limits.
         let wide = Color { mode: ColorMode::Lab, c: [1.1, -0.1, 0.6, 0.0], alpha: 0.75 };
         s.execute(SET, json!({"color": wide})).unwrap();
-        let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(s.active().unwrap().active_layer.unwrap()).unwrap().content else { panic!() };
+        let active = s.active().unwrap().active_layer.unwrap();
+        let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(active).unwrap().content else { panic!() };
         assert_eq!(stored, wide);
     }
 
