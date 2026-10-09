@@ -1,6 +1,6 @@
 //! Editing a Solid Color Fill is an undoable content edit, independent of its masks.
 
-use photocraft_color::Color;
+use photocraft_color::{Color, ColorMode};
 use photocraft_doc::{Fill, LayerContent};
 use serde_json::{Value, json};
 
@@ -15,7 +15,7 @@ fn bad(msg: &str) -> EngineError {
 
 /// Parse an RGB picker value or a full colour in its stored model. A three-component RGB
 /// value preserves alpha; opening the picker must not make a translucent fill opaque.
-pub fn color_param(value: &Value, original: Color) -> Result<Color> {
+pub fn color_param(value: &Value, original: Color, mode: ColorMode) -> Result<Color> {
     let color = match value {
         Value::String(s) => {
             let h = s.strip_prefix('#').unwrap_or(s);
@@ -25,13 +25,13 @@ pub fn color_param(value: &Value, original: Color) -> Result<Color> {
             }
             let (Some(r), Some(g), Some(b)) = (channel(0), channel(2), channel(4)) else { return Err(bad("invalid hexadecimal color")) };
             let alpha = if h.len() == 8 { channel(6).ok_or_else(|| bad("invalid alpha"))? } else { original.alpha };
-            Color::rgba(r, g, b, alpha)
+            Color::rgba(r, g, b, alpha).in_mode(mode)
         }
         Value::Array(a) if (3..=4).contains(&a.len()) => {
-            let channel = |i: usize| a.get(i).and_then(Value::as_f64).map(|v| v as f32).filter(|v| v.is_finite());
-            let (Some(r), Some(g), Some(b)) = (channel(0), channel(1), channel(2)) else { return Err(bad("color components must be finite numbers")) };
-            let alpha = if a.len() == 4 { channel(3).ok_or_else(|| bad("invalid alpha"))? } else { original.alpha };
-            Color::rgba(r, g, b, alpha)
+            let channel = |i: usize| a.get(i).and_then(Value::as_f64).filter(|v| v.is_finite() && (0.0..=1.0).contains(v)).map(|v| v as f32);
+            let (Some(r), Some(g), Some(b)) = (channel(0), channel(1), channel(2)) else { return Err(bad("RGB components must be finite numbers within 0..1")) };
+            let alpha = if a.len() == 4 { channel(3).ok_or_else(|| bad("alpha must be a finite number within 0..1"))? } else { original.alpha };
+            Color::rgba(r, g, b, alpha).in_mode(mode)
         }
         Value::Object(_) => serde_json::from_value::<Color>(value.clone()).map_err(|_| bad("invalid stored Color"))?,
         _ => return Err(bad("color must be hexadecimal RGB, [r,g,b,a?], or a stored Color")),
@@ -55,7 +55,7 @@ fn set(s: &mut Session, p: &Value) -> Result<Value> {
     let id = layer_param(s, p)?;
     let layer = st.doc.layer(id).ok_or(EngineError::NoLayer(id))?;
     let LayerContent::Fill(Fill::Solid(original)) = layer.content else { return Err(bad("the target must be a Solid Color Fill layer")) };
-    let color = color_param(p.get("color").ok_or_else(|| bad("color is required"))?, original)?;
+    let color = color_param(p.get("color").ok_or_else(|| bad("color is required"))?, original, st.doc.mode)?;
     if color != original {
         check_pixels_unlocked(&st.doc, id)?;
         if st.doc.effective_locks(id).transparency && color.alpha != original.alpha {
@@ -86,7 +86,6 @@ pub fn specs() -> Vec<CommandSpec> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use photocraft_color::ColorMode;
 
     #[test]
     fn edit_preserves_layer_and_masks_at_all_depths_and_undo_redo() {
@@ -157,4 +156,92 @@ mod tests {
         }
         s.execute(SET, json!({"color": "#abcdef"})).unwrap();
     }
+
+    #[test]
+    fn rgb_picker_inputs_follow_document_mode_and_preserve_alpha() {
+        for (mode_command, mode) in [
+            (None, ColorMode::Rgb),
+            (Some("image.mode.cmyk"), ColorMode::Cmyk),
+            (Some("image.mode.lab"), ColorMode::Lab),
+        ] {
+            let mut s = Session::new();
+            s.execute("file.new", json!({"width": 8, "height": 8, "depth": 16})).unwrap();
+            if let Some(cmd) = mode_command {
+                s.execute(cmd, json!({})).unwrap();
+            }
+            let id = s.execute("layer.newFillLayer.solidColor", json!({"color": "#12345680"})).unwrap()["layer"].as_u64().unwrap();
+            let original = match s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content {
+                LayerContent::Fill(Fill::Solid(c)) => c,
+                _ => panic!(),
+            };
+            assert_eq!(s.active().unwrap().doc.mode, mode);
+            let count = s.active().unwrap().history.entries().len();
+            for (value, rgb) in [
+                (json!("#336699"), Color::rgba(51.0 / 255.0, 102.0 / 255.0, 153.0 / 255.0, original.alpha)),
+                (json!([0.2, 0.4, 0.6]), Color::rgba(0.2, 0.4, 0.6, original.alpha)),
+            ] {
+                let expected = rgb.in_mode(mode);
+                let result = s.execute(SET, json!({"layer": id, "color": value})).unwrap();
+                assert_eq!(serde_json::from_value::<Color>(result["color"].clone()).unwrap(), expected);
+                let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
+                assert_eq!(stored, expected);
+                assert_eq!(stored.alpha, original.alpha);
+            }
+            assert_eq!(s.active().unwrap().history.entries().len(), count + 2);
+            let expected = Color::rgba(0.2, 0.4, 0.6, 0.25).in_mode(mode);
+            s.execute(SET, json!({"layer": id, "color": [0.2, 0.4, 0.6, 0.25]})).unwrap();
+            let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
+            assert_eq!(stored, expected);
+            s.execute("edit.undo", json!({})).unwrap();
+            let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
+            assert_eq!(stored, Color::rgba(0.2, 0.4, 0.6, original.alpha).in_mode(mode));
+            s.execute("edit.redo", json!({})).unwrap();
+            let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
+            assert_eq!(stored, expected);
+        }
+    }
+
+    #[test]
+    fn stored_colour_remains_exact_without_rgb_conversion_or_extra_history() {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 4, "height": 4})).unwrap();
+        s.execute("image.mode.cmyk", json!({})).unwrap();
+        s.execute("layer.newFillLayer.solidColor", json!({})).unwrap();
+        let imported = Color { mode: ColorMode::Lab, c: [0.5123457, 0.4987654, 0.5678912, 0.0], alpha: 0.3456789 };
+        s.execute(SET, json!({"color": imported})).unwrap();
+        let before = s.active().unwrap().doc.clone();
+        let count = s.active().unwrap().history.entries().len();
+        let result = s.execute(SET, json!({"color": imported})).unwrap();
+        assert_eq!(serde_json::from_value::<Color>(result["color"].clone()).unwrap(), imported);
+        assert!(std::sync::Arc::ptr_eq(&before, &s.active().unwrap().doc));
+        assert_eq!(s.active().unwrap().history.entries().len(), count);
+    }
+
+    #[test]
+    fn invalid_rgb_components_leave_document_and_history_unchanged() {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 4, "height": 4})).unwrap();
+        s.execute("layer.newFillLayer.solidColor", json!({})).unwrap();
+        let before = s.active().unwrap().doc.clone();
+        let count = s.active().unwrap().history.entries().len();
+        for color in [
+            json!([5.0, 0.0, 0.0]), json!([-0.01, 0.0, 0.0]),
+            json!([1.00000000000001_f64, 0.0, 0.0]),
+            json!([0.0, 0.0, 0.0, -0.1]), json!([0.0, 0.0, 0.0, 1.1]),
+            json!([1e300, 0.0, 0.0]), json!(["NaN", 0.0, 0.0]),
+            json!(["Infinity", 0.0, 0.0]), json!([null, 0.0, 0.0]),
+            json!([0.0, 0.0]), json!([0.0, 0.0, 0.0, 0.0, 0.0]),
+        ] {
+            let err = s.execute(SET, json!({"color": color})).unwrap_err();
+            assert!(matches!(err, EngineError::BadParams { .. }), "{err}");
+            assert!(std::sync::Arc::ptr_eq(&before, &s.active().unwrap().doc));
+            assert_eq!(s.active().unwrap().history.entries().len(), count);
+        }
+        // Stored non-RGB colours are not subject to the RGB picker component limits.
+        let wide = Color { mode: ColorMode::Lab, c: [1.1, -0.1, 0.6, 0.0], alpha: 0.75 };
+        s.execute(SET, json!({"color": wide})).unwrap();
+        let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(s.active().unwrap().active_layer.unwrap()).unwrap().content else { panic!() };
+        assert_eq!(stored, wide);
+    }
+
 }

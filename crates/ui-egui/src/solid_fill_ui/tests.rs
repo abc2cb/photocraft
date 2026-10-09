@@ -158,3 +158,38 @@ fn picker_never_applies_to_a_different_document_with_the_same_layer_id() {
     assert!(crate::dialogs::confirm(app, dialog).is_err());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
 }
+
+#[test]
+fn cmyk_lab_preview_thumbnail_cancel_and_ok_are_consistent() {
+    for (command, mode) in [("image.mode.cmyk", ColorMode::Cmyk), ("image.mode.lab", ColorMode::Lab)] {
+        let (mut h, id) = harness(1.0);
+        let app = h.state_mut();
+        app.run(command, json!({})).unwrap();
+        app.run("layer.select", json!({"layer": id.0})).unwrap();
+        let before = app.session.active().unwrap().doc.clone();
+        let LayerContent::Fill(Fill::Solid(original)) = before.layer(id).unwrap().content else { panic!() };
+        assert_eq!(before.mode, mode);
+        let count = app.session.active().unwrap().history.entries().len();
+        let dialog = open(app).unwrap();
+        app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+        let (shown, _) = display_doc(app, app.session.active_index().unwrap()).unwrap();
+        let LayerContent::Fill(Fill::Solid(preview)) = shown.layer(id).unwrap().content else { panic!() };
+        assert_eq!(preview, Color::rgba(1.0, 136.0 / 255.0, 0.0, original.alpha).in_mode(mode));
+        assert_eq!(thumbnail_color(app, before.id, id, original), preview);
+        assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
+        assert_eq!(app.session.active().unwrap().history.entries().len(), count);
+        app.ui.close_dialog(dialog);
+        assert!(display_doc(app, app.session.active_index().unwrap()).is_none());
+        assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
+        assert_eq!(app.session.active().unwrap().history.entries().len(), count);
+        let dialog = open(app).unwrap();
+        app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+        crate::dialogs::confirm(app, dialog).unwrap();
+        assert_eq!(app.session.active().unwrap().doc.layer(id).unwrap().content, LayerContent::Fill(Fill::Solid(preview)));
+        assert_eq!(app.session.active().unwrap().history.entries().len(), count + 1);
+        app.run("edit.undo", json!({})).unwrap();
+        assert_eq!(*app.session.active().unwrap().doc, *before);
+        app.run("edit.redo", json!({})).unwrap();
+        assert_eq!(app.session.active().unwrap().doc.layer(id).unwrap().content, LayerContent::Fill(Fill::Solid(preview)));
+    }
+}

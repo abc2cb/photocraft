@@ -45,7 +45,7 @@ pub(crate) fn thumbnail_color(app: &PhotocraftApp, document: DocId, layer: Layer
             if params.get("document")?.as_u64()? != document.0 || params.get("layer")?.as_u64()? != layer.0 || d.fields.get("color") == d.fields.get("__orig") {
                 return None;
             }
-            cmds::color_param(d.fields.get("color")?, original).ok()
+            cmds::color_param(d.fields.get("color")?, original, app.session.documents().iter().find(|st| st.doc.id == document)?.doc.mode).ok()
         })
         .unwrap_or(original)
 }
@@ -84,7 +84,7 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     }
     let layer = LayerId(params.get("layer")?.as_u64()?);
     let LayerContent::Fill(Fill::Solid(original)) = st.doc.layer(layer)?.content else { return None };
-    let color = cmds::color_param(d.fields.get("color")?, original).ok()?;
+    let color = cmds::color_param(d.fields.get("color")?, original, st.doc.mode).ok()?;
     if let Some(p) = &app.solid_fill_preview
         && p.document == st.doc.id
         && p.revision == st.revision
