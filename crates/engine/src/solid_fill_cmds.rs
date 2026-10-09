@@ -161,11 +161,7 @@ mod tests {
 
     #[test]
     fn rgb_picker_inputs_follow_document_mode_and_preserve_alpha() {
-        for (mode_command, mode) in [
-            (None, ColorMode::Rgb),
-            (Some("image.mode.cmyk"), ColorMode::Cmyk),
-            (Some("image.mode.lab"), ColorMode::Lab),
-        ] {
+        for (mode_command, mode) in [(None, ColorMode::Rgb), (Some("image.mode.cmyk"), ColorMode::Cmyk), (Some("image.mode.lab"), ColorMode::Lab)] {
             let mut s = Session::new();
             s.execute("file.new", json!({"width": 8, "height": 8, "depth": 16})).unwrap();
             if let Some(cmd) = mode_command {
@@ -227,12 +223,17 @@ mod tests {
         let before = s.active().unwrap().doc.clone();
         let count = s.active().unwrap().history.entries().len();
         for color in [
-            json!([5.0, 0.0, 0.0]), json!([-0.01, 0.0, 0.0]),
+            json!([5.0, 0.0, 0.0]),
+            json!([-0.01, 0.0, 0.0]),
             json!([1.00000000000001_f64, 0.0, 0.0]),
-            json!([0.0, 0.0, 0.0, -0.1]), json!([0.0, 0.0, 0.0, 1.1]),
-            json!([1e300, 0.0, 0.0]), json!(["NaN", 0.0, 0.0]),
-            json!(["Infinity", 0.0, 0.0]), json!([null, 0.0, 0.0]),
-            json!([0.0, 0.0]), json!([0.0, 0.0, 0.0, 0.0, 0.0]),
+            json!([0.0, 0.0, 0.0, -0.1]),
+            json!([0.0, 0.0, 0.0, 1.1]),
+            json!([1e300, 0.0, 0.0]),
+            json!(["NaN", 0.0, 0.0]),
+            json!(["Infinity", 0.0, 0.0]),
+            json!([null, 0.0, 0.0]),
+            json!([0.0, 0.0]),
+            json!([0.0, 0.0, 0.0, 0.0, 0.0]),
         ] {
             let err = s.execute(SET, json!({"color": color})).unwrap_err();
             assert!(matches!(err, EngineError::BadParams { .. }), "{err}");
@@ -246,5 +247,4 @@ mod tests {
         let LayerContent::Fill(Fill::Solid(stored)) = s.active().unwrap().doc.layer(active).unwrap().content else { panic!() };
         assert_eq!(stored, wide);
     }
-
 }
