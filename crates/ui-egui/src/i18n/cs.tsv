@@ -1938,6 +1938,7 @@
 	Collapse group  ({key}-click: all groups)	Sbalit skupinu  ({key}+kliknutí: všechny skupiny)
 	Create new brush from the current settings	Vytvořit nový štětec z aktuálního nastavení
 	Create new brush from these settings	Vytvořit nový štětec z tohoto nastavení
+	Update the current brush with these settings	Aktualizovat aktuální štětec těmito nastaveními
 	Delete brush	Odstranit štětec
 	Drag the arrow to set the angle, the dots to set the roundness	Tažením šipky nastavíte úhel, tažením bodů kulatost
 	Expand	Rozbalit
@@ -2015,7 +2016,13 @@
 	Align with layer	Zarovnat s vrstvou
 	Reset Alignment	Obnovit zarovnání
 	Centre the gradient (offset 0, 0)	Vystředit přechod (posun 0, 0)
-	The current gradient (pick one in Window › Gradients)	Aktuální přechod (vyberte v nabídce Okno › Přechody)
+# Gradient Editor window, opened from the options bar's gradient swatch.
+	Gradient Editor	Editor přechodů
+	Gradient picker	Výběr přechodu
+	Save As Preset	Uložit jako preset
+	The gradient the Gradient tool paints with	Přechod, který kreslí nástroj Přechod
+	Adds the current gradient to the Gradients panel	Přidá aktuální přechod do panelu Přechody
+	Gradient stops	Zarážky přechodu
 	Select a type layer to edit its character and paragraph settings.	Vyberte textovou vrstvu a upravte nastavení znaků a odstavce.
 	Text color	Barva textu
 	Type Options	Možnosti textu
@@ -2047,6 +2054,9 @@
 	Cancelled {label}	Zrušeno: {label}
 	Esc to cancel	Esc pro zrušení
 	Opening {name}	Otevírání {name}
+	Saving {name}	Ukládání {name}
+	A save to {name} is still running; try again when it finishes	Ukládání do {name} stále probíhá; zkuste to znovu, až skončí
+	{label} is writing the file and can no longer be cancelled	{label} zapisuje soubor a už ho nelze zrušit
 	Opening {name}…	Otevírání {name}…
 	Opening…	Otevírání…
 	Reading…	Načítání…
@@ -2302,3 +2312,16 @@ fontWeight	Italic	Kurzíva
 	Auto Adjust Opacity	Automaticky upravit krytí
 	Crop Shield color	Barva stínění oříznutí
 	Color Picker (Crop Shield Color)	Výběr barvy (Barva stínění oříznutí)
+	From Center	Ze středu
+	Link radii	Propojit poloměry
+	Star Ratio:	Poměr hvězdy:
+	Create Rectangle	Vytvořit obdélník
+	Create Ellipse	Vytvořit elipsu
+	Create Triangle	Vytvořit trojúhelník
+	Create Polygon	Vytvořit mnohoúhelník
+	Some brush presets could not be loaded	Některé předvolby štětců se nepodařilo načíst
+	Retry saving presets	Zkusit znovu uložit předvolby
+	Brush preset changes are not saved: {error}	Změny předvoleb štětců nejsou uloženy: {error}
+	Keep this tab open to retain your brushes.	Nechte tuto kartu otevřenou, abyste si štětce zachovali.
+	Browser storage is unavailable; brushes are session-only. Keep this tab open to retain them.	Úložiště prohlížeče není k dispozici; štětce platí jen pro tuto relaci. Nechte tuto kartu otevřenou, abyste si je zachovali.
+	Saving brush presets… Keep this tab open until saving finishes.	Ukládání předvoleb štětců… Nechte tuto kartu otevřenou, dokud ukládání neskončí.

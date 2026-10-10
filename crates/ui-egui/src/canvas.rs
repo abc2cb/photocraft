@@ -659,6 +659,15 @@ impl ViewXform {
     }
 }
 
+/// Document point under a screen position on the main canvas, or `None` when the position is
+/// outside it: the rulers are not part of the canvas, so drops on the ruler strip are not
+/// canvas drops. Preset-panel drops and drag-and-drop placement share this so both land exactly
+/// where the canvas draws.
+pub fn doc_point_at(app: &PhotocraftApp, pos: Pos2) -> Option<[f64; 2]> {
+    let xf = ViewXform::active(app)?;
+    xf.rect.contains(pos).then(|| xf.to_doc(pos))
+}
+
 /// Fit the document into `area` (egui points) for a display with `ppp` physical pixels per
 /// point; `View::zoom` is stored in physical pixels per document pixel.
 pub fn fit_view(view: &mut View, doc: &Document, area: Vec2, ppp: f32) {
@@ -2451,7 +2460,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // Pen pressure/tilt for this frame's tool events (mouse = 1.0), unless Preferences › Tools ›
     // Use Tablet Pressure is off; the pen's eraser end selects the Eraser.
     app.stylus.use_pressure = app.session.prefs().tools.use_tablet_pressure;
-    app.stylus.update(&ui.input(|i| i.events.clone()));
+    app.stylus.update_for_frame(ui.ctx().cumulative_frame_nr(), &ui.input(|i| i.events.clone()));
     crate::stylus::Stylus::sync_eraser_tool(app);
     // A Magnetic Lasso border left behind by a tool or document switch is dropped.
     crate::magnetic_lasso_ui::frame(app);
@@ -2694,9 +2703,12 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             let n = positions.len();
             for (k, p) in positions.into_iter().enumerate() {
                 app.stylus.clock_ms = spread_ms(base, now_ms, k, n);
+                // This move's share of the pen samples the frame brought (pressure, tilt, rotation).
+                app.stylus.select(k, n);
                 let d = xf.to_doc(p);
                 tool_event(app, ToolEvent::Move { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
             }
+            app.stylus.clear_selection();
             app.stylus.clock_ms = now_ms;
             // A held pen keeps the clock running for airbrush build-up and smoothing catch-up.
             if app.drag.is_some() && stroke_wants_time(app) {
@@ -2868,30 +2880,35 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                     // full size), precise crosshair, or the standard pointer.
                     use photocraft_engine::prefs::PaintingCursor;
                     let cur = app.session.prefs().cursors.clone();
-                    let painting = app.drag.is_some();
-                    let brush = &app.session.tools.brush;
-                    let full = (brush.size / 2.0 * xf.zoom).max(1.0);
-                    let r = if cur.painting == PaintingCursor::NormalTip { (full * (0.5 + 0.5 * brush.hardness.clamp(0.0, 1.0))).max(1.0) } else { full };
-                    match cur.painting {
-                        PaintingCursor::Standard => egui::CursorIcon::Default,
-                        PaintingCursor::Precise => crate::tool_cursor::crosshair(&painter, p, 6.0, 0.0),
-                        _ if painting && cur.show_only_crosshair_while_painting => crate::tool_cursor::crosshair(&painter, p, 5.0, 0.0),
-                        // The Pencil: the square of whole pixels its dab fills, on the pixel grid.
-                        _ if tool == Tool::Pencil => {
-                            let ppp = painter.ctx().pixels_per_point();
-                            let sq = pencil_cursor_rect(&xf, xf.to_doc(p), brush.size, ppp);
-                            let px = 1.0 / ppp;
-                            painter.rect_stroke(sq, 0.0, Stroke::new(px, Color32::from_black_alpha(160)), egui::StrokeKind::Outside);
-                            painter.rect_stroke(sq, 0.0, Stroke::new(px, Color32::from_white_alpha(230)), egui::StrokeKind::Inside);
-                            // Too small to see where it is: the hotspot as well.
-                            if cur.show_crosshair_in_brush_tip || sq.width() < 6.0 {
-                                crate::tool_cursor::crosshair(&painter, p, 4.0, 0.0);
+                    // ⇪ forces the precise crosshair, whatever the cursor preference (#1758).
+                    if app.caps_lock {
+                        crate::tool_cursor::crosshair(&painter, p, 6.0, 0.0)
+                    } else {
+                        let painting = app.drag.is_some();
+                        let brush = &app.session.tools.brush;
+                        let full = (brush.size / 2.0 * xf.zoom).max(1.0);
+                        let r = if cur.painting == PaintingCursor::NormalTip { (full * (0.5 + 0.5 * brush.hardness.clamp(0.0, 1.0))).max(1.0) } else { full };
+                        match cur.painting {
+                            PaintingCursor::Standard => egui::CursorIcon::Default,
+                            PaintingCursor::Precise => crate::tool_cursor::crosshair(&painter, p, 6.0, 0.0),
+                            _ if painting && cur.show_only_crosshair_while_painting => crate::tool_cursor::crosshair(&painter, p, 5.0, 0.0),
+                            // The Pencil: the square of whole pixels its dab fills, on the pixel grid.
+                            _ if tool == Tool::Pencil => {
+                                let ppp = painter.ctx().pixels_per_point();
+                                let sq = pencil_cursor_rect(&xf, xf.to_doc(p), brush.size, ppp);
+                                let px = 1.0 / ppp;
+                                painter.rect_stroke(sq, 0.0, Stroke::new(px, Color32::from_black_alpha(160)), egui::StrokeKind::Outside);
+                                painter.rect_stroke(sq, 0.0, Stroke::new(px, Color32::from_white_alpha(230)), egui::StrokeKind::Inside);
+                                // Too small to see where it is: the hotspot as well.
+                                if cur.show_crosshair_in_brush_tip || sq.width() < 6.0 {
+                                    crate::tool_cursor::crosshair(&painter, p, 4.0, 0.0);
+                                }
+                                egui::CursorIcon::None
                             }
-                            egui::CursorIcon::None
-                        }
-                        _ => {
-                            let centre = brush_tip_centre(tool, alt || app.ui.shell.sticky_alt, cur.show_crosshair_in_brush_tip, r);
-                            crate::tool_cursor::circle(&painter, p, r, centre)
+                            _ => {
+                                let centre = brush_tip_centre(tool, alt || app.ui.shell.sticky_alt, cur.show_crosshair_in_brush_tip, r);
+                                crate::tool_cursor::circle(&painter, p, r, centre)
+                            }
                         }
                     }
                 }
@@ -3964,6 +3981,10 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
     }
     match d.tool {
         Tool::ObjectSelection => crate::retouch_ui::finish_object_selection(app, d.start, [end[0], end[1]], d.modifiers),
+        // Photoshop: a click without dragging opens Create Rectangle / Ellipse / … instead.
+        t if crate::vector_ui::is_shape_tool(t)
+            && crate::shape_dialog::is_click(d.start, &d.points, app.current_zoom())
+            && crate::shape_dialog::open(app, t, d.start).is_some() => {}
         t if crate::vector_ui::is_shape_tool(t) => crate::vector_ui::finish_shape(app, t, d.start, [end[0], end[1]], d.live),
         Tool::PathSelection => crate::vector_ui::path_selection_finish(app, d.start, [end[0], end[1]]),
         Tool::Type | Tool::VerticalType => crate::type_tool::pointer_up(app, d.start, [end[0], end[1]]),

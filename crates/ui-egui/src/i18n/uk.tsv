@@ -949,6 +949,7 @@
 	Brush Preset Options	Параметри набору пензля
 	New Brush	Новий пензель
 	Create new brush from these settings	Створити новий пензель із цими параметрами
+	Update the current brush with these settings	Оновити поточний пензель цими параметрами
 	Reset the brush to the defaults	Скинути пензель до типових значень
 	No brush presets	Немає наборів пензлів
 	Override Pressure	Перевизначити натиск
@@ -1900,6 +1901,13 @@
 	Capture	Зберегти стан
 	Center Crop Marks	Центральні мітки обрізання
 	Centre the gradient (offset 0, 0)	Центрувати градієнт (зсув 0, 0)
+# Gradient Editor window, opened from the options bar's gradient swatch.
+	Gradient Editor	Редактор градієнтів
+	Gradient picker	Вибір градієнта
+	Gradient stops	Точки градієнта
+	Save As Preset	Зберегти як набір
+	The gradient the Gradient tool paints with	Градієнт, яким малює інструмент «Градієнт»
+	Adds the current gradient to the Gradients panel	Додає поточний градієнт на панель «Градіенти»
 	Change Screen Mode  (F)	Змінити режим екрана  (F)
 	Change To:	Змінити на:
 	Clear All	Очистити все
@@ -2304,6 +2312,9 @@
 	Cancelled {label}	Скасовано: {label}
 	Esc to cancel	Esc для скасування
 	Opening {name}	Відкриття {name}
+	Saving {name}	Збереження {name}
+	A save to {name} is still running; try again when it finishes	Збереження в {name} ще триває; спробуйте ще раз, коли воно завершиться
+	{label} is writing the file and can no longer be cancelled	{label}: триває запис файлу, скасувати вже не можна
 	Opening {name}…	Відкриття {name}…
 	Opening…	Відкриття…
 	Reading…	Читання…
@@ -3411,3 +3422,16 @@ cameraRaw	Masking	Маскування
 	Auto Adjust Opacity	Автоматично налаштовувати непрозорість
 	Crop Shield color	Колір екрана кадрування
 	Color Picker (Crop Shield Color)	Вибір кольору (колір екрана кадрування)
+	From Center	Від центру
+	Link radii	Зв'язати радіуси
+	Star Ratio:	Пропорції зірки:
+	Create Rectangle	Створити прямокутник
+	Create Ellipse	Створити еліпс
+	Create Triangle	Створити трикутник
+	Create Polygon	Створити багатокутник
+	Some brush presets could not be loaded	Не вдалося завантажити деякі набори пензлів
+	Retry saving presets	Повторити збереження наборів
+	Brush preset changes are not saved: {error}	Зміни наборів пензлів не збережено: {error}
+	Keep this tab open to retain your brushes.	Не закривайте цю вкладку, щоб зберегти пензлі.
+	Browser storage is unavailable; brushes are session-only. Keep this tab open to retain them.	Сховище браузера недоступне; пензлі діють лише в цьому сеансі. Не закривайте цю вкладку, щоб зберегти їх.
+	Saving brush presets… Keep this tab open until saving finishes.	Збереження наборів пензлів… Не закривайте цю вкладку, доки збереження не завершиться.

@@ -1885,6 +1885,7 @@
 	Collapse group  ({key}-click: all groups)	Ciutkan grup  ({key}-klik: semua grup)
 	Create new brush from the current settings	Buat kuas baru dari pengaturan saat ini
 	Create new brush from these settings	Buat kuas baru dari pengaturan ini
+	Update the current brush with these settings	Perbarui kuas saat ini dengan pengaturan ini
 	Delete brush	Hapus kuas
 	Drag the arrow to set the angle, the dots to set the roundness	Seret panah untuk mengatur sudut, titik untuk mengatur kebulatan
 	Expand	Bentangkan
@@ -1959,7 +1960,13 @@
 	Align with layer	Sejajarkan dengan layer
 	Reset Alignment	Reset Penyelarasan
 	Centre the gradient (offset 0, 0)	Tengahkan gradien (offset 0, 0)
-	The current gradient (pick one in Window › Gradients)	Gradien saat ini (pilih di Jendela › Gradien)
+# Gradient Editor window, opened from the options bar's gradient swatch.
+	Gradient Editor	Editor Gradien
+	Gradient picker	Pemilih gradien
+	Save As Preset	Simpan sebagai Preset
+	The gradient the Gradient tool paints with	Gradien yang digambar oleh alat Gradien
+	Adds the current gradient to the Gradients panel	Menambahkan gradien saat ini ke panel Gradien
+	Gradient stops	Titik gradien
 	Select a type layer to edit its character and paragraph settings.	Pilih layer teks untuk mengedit pengaturan karakter dan paragrafnya.
 	Text color	Warna teks
 	Type Options	Opsi Teks
@@ -1990,6 +1997,9 @@
 	Cancelled {label}	{label} dibatalkan
 	Esc to cancel	Esc untuk batal
 	Opening {name}	Membuka {name}
+	Saving {name}	Menyimpan {name}
+	A save to {name} is still running; try again when it finishes	Penyimpanan ke {name} masih berjalan; coba lagi setelah selesai
+	{label} is writing the file and can no longer be cancelled	{label} sedang menulis berkas dan tidak dapat dibatalkan lagi
 	Opening {name}…	Membuka {name}…
 	Opening…	Membuka…
 	Reading…	Membaca…
@@ -2710,3 +2720,16 @@ fontWeight	Italic	Miring
 	Auto Adjust Opacity	Sesuaikan Opasitas Otomatis
 	Crop Shield color	Warna perisai crop
 	Color Picker (Crop Shield Color)	Pemilih Warna (Warna Perisai Crop)
+	From Center	Dari Tengah
+	Link radii	Tautkan radius
+	Star Ratio:	Rasio bintang:
+	Create Rectangle	Buat Persegi Panjang
+	Create Ellipse	Buat Elips
+	Create Triangle	Buat Segitiga
+	Create Polygon	Buat Poligon
+	Some brush presets could not be loaded	Beberapa preset kuas tidak dapat dimuat
+	Retry saving presets	Coba simpan preset lagi
+	Brush preset changes are not saved: {error}	Perubahan preset kuas belum disimpan: {error}
+	Keep this tab open to retain your brushes.	Biarkan tab ini terbuka untuk mempertahankan kuas Anda.
+	Browser storage is unavailable; brushes are session-only. Keep this tab open to retain them.	Penyimpanan browser tidak tersedia; kuas hanya berlaku untuk sesi ini. Biarkan tab ini terbuka untuk mempertahankannya.
+	Saving brush presets… Keep this tab open until saving finishes.	Menyimpan preset kuas… Biarkan tab ini terbuka sampai penyimpanan selesai.
